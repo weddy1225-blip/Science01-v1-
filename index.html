@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>自然探險小隊 - 80題全自動紀錄版</title>
+    <style>
+        :root { --primary: #2e7d32; --secondary: #f57c00; --bg: #f9fbe7; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        
+        #game-box { 
+            max-width: 800px; 
+            width: 100%; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 30px; 
+            border: 6px solid #aed581; 
+            box-shadow: 0 10px 0 #dcedc8; 
+            text-align: center; 
+        }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        .story-card { background: #f1f8e9; padding: 25px; border-radius: 20px; margin-bottom: 20px; border: 2px solid #c5e1a5; text-align: left; }
+        .story-card h3 { color: var(--primary); margin-top: 0; font-size: 24px; }
+        .story-card p { line-height: 1.8; font-size: 19px; color: #333; }
+        
+        .mission-log { 
+            background: #fff9c4; 
+            padding: 25px; 
+            border-radius: 20px; 
+            border: 2px dashed #fbc02d; 
+            margin: 20px 0; 
+            font-size: 22px;
+            line-height: 1.6;
+            min-height: 120px; 
+            display: flex;
+            align-items: center; 
+            justify-content: flex-start; 
+            text-align: left;
+        }
+
+        .options { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .card { 
+            cursor: pointer; 
+            border: 3px solid #eee; 
+            border-radius: 15px; 
+            padding: 18px; 
+            font-size: 19px; 
+            background: #fff; 
+            text-align: left; 
+            transition: 0.2s; 
+        }
+        .card:hover { border-color: var(--secondary); background: #fffde7; transform: translateX(5px); }
+        .card.correct { border-color: #4caf50; background: #e8f5e9; }
+        .card.wrong { border-color: #ef5350; background: #ffebee; }
+        
+        .btn { 
+            display: block; 
+            width: 240px; 
+            margin: 20px auto; 
+            padding: 15px; 
+            background: var(--secondary); 
+            color: white; 
+            border: none; 
+            border-radius: 50px; 
+            font-size: 20px; 
+            cursor: pointer; 
+            box-shadow: 0 5px 0 #e65100; 
+            font-weight: bold; 
+        }
+        .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #e65100; }
+        
+        .progress-header { font-weight: bold; color: #558b2f; margin-bottom: 15px; font-size: 18px; }
+        #feedback { margin-top:15px; font-weight:bold; font-size:1.2em; min-height: 1.5em; }
+    </style>
+</head>
+<body>
+
+<div id="game-box">
+    <!-- 1. 遊戲介紹頁 -->
+    <div id="screen-intro" class="screen active">
+        <h1>🌿 自然探險小隊</h1>
+        <div class="story-card">
+            <h3>📢 指揮中心通報：</h3>
+            <p>小隊員，歡迎來到探險總部！我們發現大自然中隱藏著許多祕密，從「古老地層的岩石」到「神祕的水生生物」，都需要你親自前往觀察並記錄。</p>
+            <p>這本「探險筆記」中散落著 80 則觀察紀錄，請幫我們找出真相。每成功完成 5 項紀錄，你就能獲得榮譽稱號！</p>
+        </div>
+        <div id="remaining-count" style="margin-bottom: 15px; font-weight: bold; color: #2e7d32;"></div>
+        <button id="start-btn" class="btn" onclick="startGame()">開始領取紀錄任務</button>
+        <button id="restart-all-btn" class="btn" style="display:none; background:#78909c; box-shadow: 0 5px 0 #455a64;" onclick="resetMemory()">重新開始全紀錄探險</button>
+    </div>
+
+    <!-- 2. 遊戲主體 -->
+    <div id="screen-game" class="screen">
+        <div id="progress-header" class="progress-header">目前調查進度：1 / 5</div>
+        <div class="mission-log">
+            <div id="question-text">📡 正在讀取資料...</div>
+        </div>
+        <div class="options" id="options-container"></div>
+        <div id="feedback"></div>
+        <button id="next-btn" class="btn" style="display:none;" onclick="nextQuestion()">分析下一則筆記 ➔</button>
+    </div>
+
+    <!-- 3. 結算頁 -->
+    <div id="screen-result" class="screen">
+        <h1>📊 調查結果報告</h1>
+        <div id="score-display" style="font-size: 24px; font-weight: bold; margin: 15px 0;"></div>
+        <div id="title-display" style="font-size: 28px; color: var(--secondary); margin-bottom: 20px;"></div>
+        <div id="review-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 10px; background: #fafafa; text-align: left; margin-bottom: 20px;"></div>
+        <button class="btn" onclick="location.reload()">回首頁繼續探險</button>
+    </div>
+</div>
+
+<script>
+    // --- 完整 80 題題庫 ---
+    const fullQuestonDB = [
+        // 地質 (1-10)
+        { id: 1, q: "「這種岩石上有黑白斑點，像芝麻一樣，摸起來非常堅硬。」", a: "花崗岩", o: ["花崗岩", "頁岩", "大理岩"] },
+        { id: 2, q: "「在河邊發現的，身體圓圓滑滑、沒有稜角，像顆雞蛋。」", a: "鵝卵石", o: ["鵝卵石", "礫石", "石灰岩"] },
+        { id: 3, q: "「摸起來細細的，層次感很明顯，以前常用來當成書寫石板。」", a: "頁岩", o: ["頁岩", "玄武岩", "砂岩"] },
+        { id: 4, q: "「加了水後會變硬，是建築工地蓋房子不可或缺的材料。」", a: "水泥粉", o: ["水泥粉", "麵粉", "石膏"] },
+        { id: 5, q: "「由貝殼或珊瑚遺骸長期堆積形成，常用於建築裝修或雕刻。」", a: "大理岩", o: ["大理岩", "安山岩", "頁岩"] },
+        { id: 6, q: "「這種岩石摸起來粗粗的，是由沙粒黏合而成，常見於海邊。」", a: "砂岩", o: ["砂岩", "頁岩", "花崗岩"] },
+        { id: 7, q: "「顏色偏黑或暗青色，是岩漿冷凝後形成的，台灣北海岸常見。」", a: "安山岩", o: ["安山岩", "石灰岩", "大理石"] },
+        { id: 8, q: "「它是泥土與有機物混合，聞起來有泥土香味，適合植物生長。」", a: "肥沃土壤", o: ["肥沃土壤", "乾燥沙灘", "水泥"] },
+        { id: 9, q: "「這種岩石有很多孔隙，甚至能浮在水面上，又稱為浮石。」", a: "火山岩", o: ["火山岩", "大理石", "花崗岩"] },
+        { id: 10, q: "「在山上發現一種層層堆疊的岩石，裡面還藏著古生物的形狀。」", a: "化石", o: ["化石", "大理石", "玄武岩"] },
+        // 水生植物 (11-20)
+        { id: 11, q: "「葉柄膨大像小氣球，裡面充滿空氣，讓整棵植物漂浮在水面。」", a: "布袋蓮", o: ["布袋蓮", "蓮花", "水蘊草"] },
+        { id: 12, q: "「根在泥土裡，葉子圓圓的挺出水面，水珠在上面會滾動不沾濕。」", a: "蓮花", o: ["蓮花", "睡蓮", "大萍"] },
+        { id: 13, q: "「整株都長在水面下，葉子細長，會隨水流左右擺動。」", a: "水蘊草", o: ["水蘊草", "金魚藻", "睡蓮"] },
+        { id: 14, q: "「外型像一朵綠色小花，漂浮在水面，表面有細毛防止水進入。」", a: "大萍", o: ["大萍", "浮萍", "蓮花"] },
+        { id: 15, q: "「葉片扁平圓形，貼在水面上生長，跟蓮花不同，它不會挺出水面。」", a: "睡蓮", o: ["睡蓮", "布袋蓮", "大萍"] },
+        { id: 16, q: "「個頭非常小，像綠色的小點點，常成群鋪滿整個池塘表面。」", a: "浮萍", o: ["浮萍", "布袋蓮", "水蘊草"] },
+        { id: 17, q: "「葉子長得像羽毛，整株沉在水裡，是魚缸中常見的植物。」", a: "金魚藻", o: ["金魚藻", "睡蓮", "大萍"] },
+        { id: 18, q: "「根長在水邊泥土，莖挺出水面，長得像一支支綠色的毛筆。」", a: "香蒲", o: ["香蒲", "布袋蓮", "浮萍"] },
+        { id: 19, q: "「它是一種生長在海邊，根部會伸出泥土呼吸的樹木，又稱紅樹林。」", a: "水筆仔", o: ["水筆仔", "榕樹", "相思樹"] },
+        { id: 20, q: "「這種植物的莖中空，可以減少重量，方便在水中支撐身體。」", a: "水生植物特性", o: ["水生植物特性", "陸生植物特性", "仙人掌特性"] },
+        // 陸生與構造 (21-30)
+        { id: 21, q: "「長在泥土裡，負責吸收水分並固定身體，不讓風吹倒。」", a: "根", o: ["根", "莖", "葉"] },
+        { id: 22, q: "「負責運送養分，像管子一樣支撐整棵植物，讓它長高。」", a: "莖", o: ["莖", "根", "花"] },
+        { id: 23, q: "「表面有綠色色素，主要負責吸收陽光來製造食物。」", a: "葉子", o: ["葉子", "花瓣", "種子"] },
+        { id: 24, q: "「葉脈像網子一樣散開分布，這種脈紋稱為？」", a: "網狀脈", o: ["網狀脈", "平行脈", "放射脈"] },
+        { id: 25, q: "「葉脈一條條像並排的直線，常見於竹子或稻米。」", a: "平行脈", o: ["平行脈", "網狀脈", "圓形脈"] },
+        { id: 26, q: "「這部分色彩鮮艷，還有香味，目的是吸引昆蟲來幫忙傳粉。」", a: "花朵", o: ["花朵", "根", "果實"] },
+        { id: 27, q: "「藏在果實裡面，等環境適合時就會發芽長成新生命。」", a: "種子", o: ["種子", "花粉", "葉芽"] },
+        { id: 28, q: "「它的莖非常粗壯，有厚厚的樹皮保護，活很多年都不會死。」", a: "木本植物", o: ["木本植物", "草本植物", "地衣"] },
+        { id: 29, q: "「莖比較柔軟細小，開完花結完種子後通常就會枯萎。」", a: "草本植物", o: ["草本植物", "木本植物", "仙人掌"] },
+        { id: 30, q: "「為了在沙漠生存，它的葉子退化成刺，減少水分流失。」", a: "仙人掌", o: ["仙人掌", "玫瑰", "榕樹"] },
+        // 水生動物 (31-40)
+        { id: 31, q: "「魚類在水中呼吸的器官，可以過濾水中的氧氣。」", a: "鰓", o: ["鰓", "肺", "皮膚"] },
+        { id: 32, q: "「控制魚在水中上升、下降或維持平衡的器官。」", a: "魚鰭", o: ["魚鰭", "魚鱗", "魚鰓"] },
+        { id: 33, q: "「青蛙的小時候，生活在水裡用鰓呼吸，長大後才到陸地。」", a: "蝌蚪", o: ["蝌蚪", "孑孓", "水黽"] },
+        { id: 34, q: "「能在水面上滑行而不沉下去，是因為它腳上有特殊的油質。」", a: "水黽", o: ["水黽", "蜻蜓", "大肚魚"] },
+        { id: 35, q: "「背後有堅硬的殼，遇到危險會縮進去，是水中長壽的代表。」", a: "烏龜", o: ["烏龜", "螃蟹", "蝦子"] },
+        { id: 36, q: "「身體扁平圓形，有很多對腳，兩隻大螯是防禦敵人的武器。」", a: "螃蟹", o: ["螃蟹", "蝦子", "章魚"] },
+        { id: 37, q: "「蚊子的小時候，常在積水的容器或池塘中扭動身體。」", a: "孑孓", o: ["孑孓", "毛毛蟲", "蚯蚓"] },
+        { id: 38, q: "「牠們群聚在一起形成像石頭的構造，是海洋生物的避風港。」", a: "珊瑚", o: ["珊瑚", "海藻", "貝殼"] },
+        { id: 39, q: "「身體透明像把傘，隨海水漂浮，觸手可能有毒液。」", a: "水母", o: ["水母", "海星", "海馬"] },
+        { id: 40, q: "「外型像星星，有五隻手，動作很慢地在海底爬行。」", a: "海星", o: ["海星", "海葵", "海膽"] },
+        // 能源與電力 (41-50)
+        { id: 41, q: "「利用高處落下的水推動發電機，轉化成我們使用的電力。」", a: "水力發電", o: ["水力發電", "風力發電", "火力發電"] },
+        { id: 42, q: "「巨大的葉片隨風旋轉，在海邊或高山上常見到的發電方式。」", a: "風力發電", o: ["風力發電", "太陽能發電", "核能發電"] },
+        { id: 43, q: "「燃燒煤炭或天然氣產生熱能，進而製造電力的方式。」", a: "火力發電", o: ["火力發電", "地熱發電", "潮汐發電"] },
+        { id: 44, q: "「安裝在屋頂上的深藍色板子，可以直接將光變成電。」", a: "太陽能板", o: ["太陽能板", "擋風玻璃", "集熱板"] },
+        { id: 45, q: "「利用地球內部的熱氣來發電，這是一種環保的能源。」", a: "地熱發電", o: ["地熱發電", "火力發電", "原子能"] },
+        { id: 46, q: "「可以重複使用的電池，充電後就能繼續提供電力。」", a: "二次電池", o: ["二次電池", "乾電池", "鈕扣電池"] },
+        { id: 47, q: "「用完即丟的電池，如果隨意亂丟會造成環境汙染。」", a: "一次電池", o: ["一次電池", "鋰電池", "蓄電池"] },
+        { id: 48, q: "「生活中省電的好習慣，離開房間要隨手做什麼？」", a: "關燈", o: ["關燈", "開窗", "鎖門"] },
+        { id: 49, q: "「標章上有一個紅色的插頭手牽手，代表這件電器很省電。」", a: "節能標章", o: ["節能標章", "環保標章", "省水標章"] },
+        { id: 50, q: "「這種能源使用過後就不會再產生，例如石油和煤。」", a: "不可再生能源", o: ["不可再生能源", "再生能源", "綠色能源"] },
+        // 環境災害 (51-60)
+        { id: 51, q: "「大地突然劇烈搖晃，是因為地殼板塊運動造成的現象。」", a: "地震", o: ["地震", "颱風", "海嘯"] },
+        { id: 52, q: "「長時間不下雨，導致土地龜裂、植物枯萎的現象。」", a: "旱災", o: ["旱災", "水災", "風災"] },
+        { id: 53, q: "「大雨過後，山上的土石混合大量水分滑落下來。」", a: "土石流", o: ["土石流", "地震", "火山爆發"] },
+        { id: 54, q: "「發生地震時，最好的防護動作是躲在桌下並保護哪裡？」", a: "頭部", o: ["頭部", "腳部", "肚子"] },
+        { id: 55, q: "「夏天常見的氣象災害，會帶來強風與豪雨。」", a: "颱風", o: ["颱風", "寒流", "濃霧"] },
+        { id: 56, q: "「在森林裡亂丟煙蒂可能引發什麼，燒毀大量的樹木？」", a: "森林火災", o: ["森林火災", "水災", "土石流"] },
+        { id: 57, q: "「空氣中含有過多細懸浮微粒，會讓天空看起來灰濛濛的。」", a: "空氣汙染", o: ["空氣汙染", "雲朵", "彩虹"] },
+        { id: 58, q: "「隨意將廢水排入河流，會導致魚類死亡和水質變差。」", a: "水汙染", o: ["水汙染", "噪音汙染", "熱汙染"] },
+        { id: 59, q: "「購買商品時選擇包裝較少的，可以減少垃圾的產生。」", a: "減量原則", o: ["減量原則", "回收原則", "重複使用"] },
+        { id: 60, q: "「將廢紙、寶特瓶分類放好，讓資源可以重新利用。」", a: "資源回收", o: ["資源回收", "垃圾焚化", "土地掩埋"] },
+        // 季節天文 (61-70)
+        { id: 61, q: "「太陽從哪個方向升起，這是我們判斷方位的基準。」", a: "東方", o: ["東方", "西方", "南方"] },
+        { id: 62, q: "「月亮圓缺變化的週期，大約是多少天？」", a: "30天", o: ["30天", "7天", "365天"] },
+        { id: 63, q: "「夏天夜晚在草叢中飛舞，會發出點點亮光的小昆蟲。」", a: "螢火蟲", o: ["螢火蟲", "蟬", "蝴蝶"] },
+        { id: 64, q: "「當太陽被月亮擋住，白天會突然變暗的特殊現象。」", a: "日食", o: ["日食", "月食", "流星"] },
+        { id: 65, q: "「一年之中白天最長的一天，通常是在夏季。」", a: "夏至", o: ["夏至", "冬至", "春分"] },
+        { id: 66, q: "「天氣冷的時候，水蒸氣遇冷變成的細小水滴，飄浮在地面附近。」", a: "霧", o: ["霧", "雲", "雨"] },
+        { id: 67, q: "「彩虹通常出現在下雨過後的陽光下，它有幾種顏色？」", a: "七種", o: ["七種", "五種", "三種"] },
+        { id: 68, q: "「秋天時，有些樹木的葉子會變紅或變黃掉落，例如？」", a: "楓樹", o: ["楓樹", "榕樹", "椰子樹"] },
+        { id: 69, q: "「冬天在高山上，水分凝結成白色固體掉下來，冷冰冰的。」", a: "雪", o: ["雪", "冰雹", "雨"] },
+        { id: 70, q: "「在北方的天空中，這顆星星位置幾乎不動，可用來指引方向。」", a: "北極星", o: ["北極星", "金星", "火星"] },
+        // 綜合常識 (71-80)
+        { id: 71, q: "「動物吸入氧氣，排出二氧化碳的過程稱為？」", a: "呼吸", o: ["呼吸", "循環", "消化"] },
+        { id: 72, q: "「蜘蛛並不是昆蟲，因為牠們有幾隻腳？」", a: "八隻", o: ["八隻", "六隻", "四隻"] },
+        { id: 73, q: "「昆蟲的身體分為頭、胸、腹三部分，而且有幾對翅膀？」", a: "兩對", o: ["兩對", "一對", "沒有翅膀"] },
+        { id: 74, q: "「螞蟻和蜜蜂屬於什麼生物，會分工合作一起生活？」", a: "社會性昆蟲", o: ["社會性昆蟲", "孤獨性生物", "寄生生物"] },
+        { id: 75, q: "「仙人掌的刺其實是由什麼部分演化而來的？」", a: "葉子", o: ["葉子", "莖", "根"] },
+        { id: 76, q: "「為了保護自己，身體顏色變得跟環境一樣，這叫什麼色？」", a: "保護色", o: ["保護色", "警告色", "流行色"] },
+        { id: 77, q: "「有些動物冬天會躲起來睡覺，不吃不喝直到春天。」", a: "冬眠", o: ["冬眠", "午休", "群聚"] },
+        { id: 78, q: "「蝙蝠是唯一會飛行的什麼類動物？」", a: "哺乳類", o: ["哺乳類", "鳥類", "爬行類"] },
+        { id: 79, q: "「蚯蚓在土壤裡鑽洞，可以增加土壤的什麼量，對植物有益？」", a: "含氧量", o: ["含氧量", "含鹽量", "重金屬"] },
+        { id: 80, q: "「愛護地球最好的方法是節能減碳，並減少什麼的產生？」", a: "垃圾", o: ["垃圾", "氧氣", "森林"] }
+    ];
+
+    let playedIds = JSON.parse(localStorage.getItem('natureQuizPlayedIds')) || [];
+    let sessionQuests = [];
+    let currentIndex = 0;
+    let score = 0;
+    let sessionHistory = [];
+
+    function init() {
+        const remainingCount = fullQuestonDB.length - playedIds.length;
+        
+        if (remainingCount === 0) {
+            document.getElementById('remaining-count').innerText = "🎉 恭喜！你已完成全部 80 則探險紀錄！";
+            document.getElementById('start-btn').style.display = "none";
+            document.getElementById('restart-all-btn').style.display = "block";
+        } else {
+            document.getElementById('remaining-count').innerText = `筆記中還有 ${remainingCount} 則未知的紀錄待分析...`;
+            document.getElementById('start-btn').style.display = "block";
+            document.getElementById('restart-all-btn').style.display = "none";
+        }
+    }
+
+    function startGame() {
+        const remaining = fullQuestonDB.filter(q => !playedIds.includes(q.id));
+        if (remaining.length === 0) return;
+
+        sessionQuests = remaining.sort(() => Math.random() - 0.5).slice(0, 5);
+        document.getElementById('screen-intro').classList.remove('active');
+        document.getElementById('screen-game').classList.add('active');
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        const q = sessionQuests[currentIndex];
+        document.getElementById('progress-header').innerText = `目前調查進度：${currentIndex + 1} / 5`;
+        document.getElementById('question-text').innerText = q.q;
+        document.getElementById('feedback').innerText = "";
+        document.getElementById('next-btn').style.display = "none";
+        
+        const container = document.getElementById('options-container');
+        container.innerHTML = "";
+
+        [...q.o].sort(() => Math.random() - 0.5).forEach(opt => {
+            const btn = document.createElement('div');
+            btn.className = 'card';
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(btn, opt);
+            container.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(btn, selected) {
+        const q = sessionQuests[currentIndex];
+        const isCorrect = (selected === q.a);
+        document.querySelectorAll('.card').forEach(c => c.style.pointerEvents = "none");
+
+        if (isCorrect) {
+            btn.classList.add('correct');
+            document.getElementById('feedback').innerHTML = "<span style='color:#2e7d32'>✨ 紀錄成功！分析完全正確。</span>";
+            score++;
+        } else {
+            btn.classList.add('wrong');
+            document.getElementById('feedback').innerHTML = `<span style='color:#d32f2f'>💡 錯誤！正確真相是「${q.a}」</span>`;
+        }
+
+        sessionHistory.push({ q: q.q, user: selected, correct: q.a, status: isCorrect });
+        playedIds.push(q.id);
+        localStorage.setItem('natureQuizPlayedIds', JSON.stringify(playedIds));
+        document.getElementById('next-btn').style.display = "block";
+    }
+
+    function nextQuestion() {
+        currentIndex++;
+        if (currentIndex < sessionQuests.length) {
+            loadQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    function showResult() {
+        document.getElementById('screen-game').classList.remove('active');
+        document.getElementById('screen-result').classList.add('active');
+        document.getElementById('score-display').innerText = `本次分析成功：${score} 項`;
+        
+        let title = score === 5 ? "🎖️ 傳奇觀察家" : score >= 3 ? "🧭 精英特派員" : "🎒 實習探險隊員";
+        document.getElementById('title-display').innerText = `獲得稱號：${title}`;
+        
+        const list = document.getElementById('review-list');
+        list.innerHTML = "";
+        sessionHistory.forEach((r) => {
+            const item = document.createElement('div');
+            item.style.padding = "10px";
+            item.style.borderBottom = "1px solid #eee";
+            item.innerHTML = `
+                <span style="color:${r.status?'#2e7d32':'#ef5350'}; font-weight:bold;">${r.status?'[成功]':'[修正]'}</span> 
+                ${r.q}<br>
+                <small>分析答案：${r.user} ${r.status?'':' (真相：'+r.correct+')'}</small>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function resetMemory() {
+        if(confirm("確定要重啟整個探險筆記的全紀錄嗎？")) {
+            localStorage.removeItem('natureQuizPlayedIds');
+            location.reload();
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>
